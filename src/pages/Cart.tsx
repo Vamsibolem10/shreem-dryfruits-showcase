@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import CouponInput from '@/components/promo/CouponInput';
 import { toast } from 'sonner';
 
 declare global {
@@ -17,6 +18,21 @@ export default function Cart() {
   const { items, removeFromCart, updateQuantity, total, clearCart, addOrder } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+
+  const subtotal = total;
+  const discount = appliedCoupon?.discount || 0;
+  const tax = Math.round((subtotal - discount) * 0.18);
+  const finalTotal = subtotal - discount + tax;
+
+  const handleApplyCoupon = (discountAmount: number, code: string) => {
+    setAppliedCoupon({ code, discount: discountAmount });
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+  };
 
   const handleCheckout = () => {
     if (!user) {
@@ -37,7 +53,7 @@ export default function Cart() {
     script.onload = () => {
       const options = {
         key: 'rzp_test_demo', // Demo key - replace with actual key
-        amount: total * 100, // Amount in paise
+        amount: finalTotal * 100, // Amount in paise
         currency: 'INR',
         name: 'Shreem Dryfruits',
         description: 'Premium Dry Fruits Order',
@@ -48,10 +64,12 @@ export default function Cart() {
             id: `ORD-${Date.now()}`,
             userId: user.id,
             items: [...items],
-            total,
+            total: subtotal,
             status: 'completed' as const,
             date: new Date().toISOString(),
             paymentId: response.razorpay_payment_id,
+            couponCode: appliedCoupon?.code,
+            discount: appliedCoupon?.discount,
           };
           addOrder(order);
           toast.success('Payment successful! Order placed.');
@@ -86,10 +104,10 @@ export default function Cart() {
             Your Cart is Empty
           </h1>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Looks like you haven't added any products yet. Start shopping to fill your cart with premium dry fruits!
+            Looks like you have not added any products yet. Start shopping to fill your cart with premium dry fruits!
           </p>
           <Link to="/products">
-            <Button variant="gold" size="lg">
+            <Button size="lg" className="bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] hover:bg-[hsl(42,70%,50%)]">
               Shop Now
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
@@ -135,9 +153,9 @@ export default function Cart() {
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm text-gold font-medium">{product.category}</p>
+                        <p className="text-sm text-[hsl(42,75%,55%)] font-medium">{product.category}</p>
                         <Link to={`/products/${product.id}`}>
-                          <h3 className="font-serif text-xl font-semibold text-foreground hover:text-gold transition-colors">
+                          <h3 className="font-serif text-xl font-semibold text-foreground hover:text-[hsl(42,75%,55%)] transition-colors">
                             {product.name}
                           </h3>
                         </Link>
@@ -201,30 +219,46 @@ export default function Cart() {
                   Order Summary
                 </h2>
 
+                {/* Coupon Input */}
+                <div className="mb-6">
+                  <CouponInput
+                    orderTotal={subtotal}
+                    onApply={handleApplyCoupon}
+                    onRemove={handleRemoveCoupon}
+                    appliedCode={appliedCoupon?.code}
+                    appliedDiscount={appliedCoupon?.discount}
+                  />
+                </div>
+
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
-                    <span>₹{total}</span>
+                    <span>₹{subtotal}</span>
                   </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount</span>
+                      <span>-₹{discount}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-muted-foreground">
                     <span>Shipping</span>
                     <span className="text-green-600">Free</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Tax (GST)</span>
-                    <span>₹{Math.round(total * 0.18)}</span>
+                    <span>Tax (GST 18%)</span>
+                    <span>₹{tax}</span>
                   </div>
                   <hr className="border-border" />
                   <div className="flex justify-between text-xl font-bold text-foreground">
                     <span>Total</span>
-                    <span>₹{total + Math.round(total * 0.18)}</span>
+                    <span>₹{finalTotal}</span>
                   </div>
                 </div>
 
                 <Button
-                  variant="gold"
-                  size="xl"
-                  className="w-full mb-4"
+                  size="lg"
+                  className="w-full mb-4 h-14 text-lg bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] hover:bg-[hsl(42,70%,50%)]"
                   onClick={handleCheckout}
                 >
                   Proceed to Checkout
@@ -236,8 +270,8 @@ export default function Cart() {
                   </Button>
                 </Link>
 
-                <div className="mt-6 p-4 bg-gold/10 rounded-lg">
-                  <p className="text-sm text-gold-dark font-medium">
+                <div className="mt-6 p-4 bg-[hsl(42,75%,55%)]/10 rounded-lg">
+                  <p className="text-sm text-[hsl(42,80%,35%)] font-medium">
                     🎉 Free shipping on all orders!
                   </p>
                 </div>

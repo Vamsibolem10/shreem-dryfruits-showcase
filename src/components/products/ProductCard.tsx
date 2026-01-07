@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Eye } from 'lucide-react';
+import { ShoppingCart, Eye, Star } from 'lucide-react';
 import { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
+import { useReviews } from '@/context/ReviewContext';
 import { toast } from 'sonner';
 
 interface ProductCardProps {
@@ -12,6 +13,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
+  const { getAverageRating, getProductReviews } = useReviews();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -22,6 +24,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : null;
+
+  const averageRating = getAverageRating(product.id);
+  const reviewCount = getProductReviews(product.id).length;
 
   return (
     <Link to={`/products/${product.id}`} className="group">
@@ -36,7 +41,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           
           {/* Discount Badge */}
           {discount && (
-            <div className="absolute top-4 left-4 bg-gradient-gold text-walnut-dark text-sm font-bold px-3 py-1 rounded-full shadow-gold">
+            <div className="absolute top-4 left-4 bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] text-sm font-bold px-3 py-1 rounded-full">
               -{discount}%
             </div>
           )}
@@ -69,11 +74,30 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Content */}
         <div className="p-5">
-          <p className="text-sm text-gold font-medium mb-1">{product.category}</p>
-          <h3 className="font-serif text-lg font-semibold text-foreground group-hover:text-gold transition-colors">
+          <p className="text-sm text-[hsl(42,75%,55%)] font-medium mb-1">{product.category}</p>
+          <h3 className="font-serif text-lg font-semibold text-foreground group-hover:text-[hsl(42,75%,55%)] transition-colors">
             {product.name}
           </h3>
           <p className="text-muted-foreground text-sm mt-1">{product.weight}</p>
+          
+          {/* Rating */}
+          {reviewCount > 0 && (
+            <div className="flex items-center gap-1 mt-2">
+              <div className="flex gap-0.5">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <Star
+                    key={star}
+                    className={`w-3.5 h-3.5 ${
+                      star <= Math.round(averageRating)
+                        ? 'fill-[hsl(42,75%,55%)] text-[hsl(42,75%,55%)]'
+                        : 'text-muted'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">({reviewCount})</span>
+            </div>
+          )}
           
           <div className="mt-3 flex items-center gap-3">
             <span className="text-xl font-bold text-foreground">₹{product.price}</span>
