@@ -5,14 +5,17 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductContext';
 import { useCart } from '@/context/CartContext';
+import { useReviews } from '@/context/ReviewContext';
 import { toast } from 'sonner';
 import ProductCard from '@/components/products/ProductCard';
+import ProductReviews from '@/components/products/ProductReviews';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { getProduct, products } = useProducts();
   const { addToCart } = useCart();
+  const { getAverageRating, getProductReviews } = useReviews();
   const [quantity, setQuantity] = useState(1);
 
   const product = getProduct(id || '');
@@ -25,10 +28,12 @@ export default function ProductDetail() {
             Product Not Found
           </h1>
           <p className="text-muted-foreground mb-8">
-            The product you're looking for doesn't exist or has been removed.
+            The product you are looking for does not exist or has been removed.
           </p>
           <Link to="/products">
-            <Button variant="gold">Browse Products</Button>
+            <Button className="bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] hover:bg-[hsl(42,70%,50%)]">
+              Browse Products
+            </Button>
           </Link>
         </div>
       </Layout>
@@ -52,6 +57,9 @@ export default function ProductDetail() {
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : null;
+
+  const averageRating = getAverageRating(product.id);
+  const reviewCount = getProductReviews(product.id).length;
 
   return (
     <Layout>
@@ -80,7 +88,7 @@ export default function ProductDetail() {
         </Button>
 
         {/* Product Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
           {/* Image */}
           <div className="relative aspect-square rounded-2xl overflow-hidden bg-card">
             <img
@@ -89,7 +97,7 @@ export default function ProductDetail() {
               className="w-full h-full object-cover"
             />
             {discount && (
-              <div className="absolute top-4 left-4 bg-gradient-gold text-walnut-dark text-lg font-bold px-4 py-2 rounded-full shadow-gold">
+              <div className="absolute top-4 left-4 bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] text-lg font-bold px-4 py-2 rounded-full">
                 -{discount}% OFF
               </div>
             )}
@@ -102,7 +110,7 @@ export default function ProductDetail() {
 
           {/* Info */}
           <div className="flex flex-col">
-            <p className="text-gold font-medium tracking-wide uppercase mb-2">
+            <p className="text-[hsl(42,75%,55%)] font-medium tracking-wide uppercase mb-2">
               {product.category}
             </p>
             <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-4">
@@ -112,14 +120,20 @@ export default function ProductDetail() {
             {/* Rating */}
             <div className="flex items-center gap-2 mb-6">
               <div className="flex gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
+                {[1, 2, 3, 4, 5].map(star => (
                   <Star
-                    key={i}
-                    className={`w-5 h-5 ${i < 4 ? 'fill-gold text-gold' : 'text-muted'}`}
+                    key={star}
+                    className={`w-5 h-5 ${
+                      star <= Math.round(averageRating)
+                        ? 'fill-[hsl(42,75%,55%)] text-[hsl(42,75%,55%)]'
+                        : 'text-muted'
+                    }`}
                   />
                 ))}
               </div>
-              <span className="text-muted-foreground">(4.0) • 128 Reviews</span>
+              <span className="text-muted-foreground">
+                ({averageRating || 'No ratings'}) • {reviewCount} Review{reviewCount !== 1 ? 's' : ''}
+              </span>
             </div>
 
             {/* Price */}
@@ -131,7 +145,7 @@ export default function ProductDetail() {
                 </span>
               )}
               {discount && (
-                <span className="text-lg font-semibold text-gold">
+                <span className="text-lg font-semibold text-[hsl(42,75%,55%)]">
                   Save ₹{product.originalPrice! - product.price}
                 </span>
               )}
@@ -185,9 +199,8 @@ export default function ProductDetail() {
             {/* Actions */}
             <div className="flex flex-wrap gap-4 mb-8">
               <Button
-                variant="gold"
-                size="xl"
-                className="flex-1"
+                size="lg"
+                className="flex-1 h-14 text-lg bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] hover:bg-[hsl(42,70%,50%)]"
                 onClick={handleAddToCart}
                 disabled={!product.inStock}
               >
@@ -195,9 +208,8 @@ export default function ProductDetail() {
                 Add to Cart
               </Button>
               <Button
-                variant="walnut"
-                size="xl"
-                className="flex-1"
+                size="lg"
+                className="flex-1 h-14 text-lg bg-[hsl(25,45%,25%)] text-[hsl(38,35%,95%)] hover:bg-[hsl(25,45%,20%)]"
                 onClick={handleBuyNow}
                 disabled={!product.inStock}
               >
@@ -219,9 +231,12 @@ export default function ProductDetail() {
           </div>
         </div>
 
+        {/* Reviews Section */}
+        <ProductReviews productId={product.id} />
+
         {/* Related Products */}
         {relatedProducts.length > 0 && (
-          <section>
+          <section className="mt-24">
             <h2 className="font-serif text-3xl font-bold text-foreground mb-8">
               Related Products
             </h2>
