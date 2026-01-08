@@ -107,13 +107,29 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem('shreemProducts');
-    if (stored) {
-      setProducts(JSON.parse(stored));
-    } else {
-      setProducts(defaultProducts);
-      localStorage.setItem('shreemProducts', JSON.stringify(defaultProducts));
-    }
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('/api/products');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setProducts(data.products);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch products from API:', error);
+      }
+      // Fallback to localStorage or defaults
+      const stored = localStorage.getItem('shreemProducts');
+      if (stored) {
+        setProducts(JSON.parse(stored));
+      } else {
+        setProducts(defaultProducts);
+        localStorage.setItem('shreemProducts', JSON.stringify(defaultProducts));
+      }
+    };
+    fetchProducts();
   }, []);
 
   const saveProducts = (newProducts: Product[]) => {

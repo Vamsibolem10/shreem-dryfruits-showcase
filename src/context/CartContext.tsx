@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Product, CartItem, Order } from '@/types';
 import { useAuth } from './AuthContext';
+import { emailService } from '@/lib/emailService';
+import { toast } from 'sonner';
 
 interface CartContextType {
   items: CartItem[];
@@ -12,6 +14,7 @@ interface CartContextType {
   itemCount: number;
   orders: Order[];
   addOrder: (order: Order) => void;
+  updateOrderStatus: (orderId: string, status: Order['status']) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -75,9 +78,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems([]);
   };
 
-  const addOrder = (order: Order) => {
+  const addOrder = async (order: Order) => {
     setOrders(prev => [order, ...prev]);
     clearCart();
+  };
+
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, status } : o
+    ));
+
+    // Send email notification
+    try {
+      const emailSent = await emailService.sendOrderStatusUpdateEmail(
+        { ...order, status },
+        order.userEmail,
+        order.userName
+      );
+      if (emailSent) {
+        toast.success(`Order status updated and email sent to ${order.userEmail}`);
+      } else {
+        toast.warning('Order status updated but email failed to send');
+      }
+    } catch (error) {
+      console.error('Failed to send email notification:', error);
+      toast.warning('Order status updated but email notification failed');
+    }
   };
 
   const total = items.reduce(
@@ -98,6 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       itemCount,
       orders,
       addOrder,
+      updateOrderStatus,
     }}>
       {children}
     </CartContext.Provider>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Package, Calendar, CreditCard, ArrowRight } from 'lucide-react';
+import { Package, Calendar, CreditCard, ArrowRight, Smartphone, Building2, Wallet, Truck, MapPin } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -28,6 +28,40 @@ export default function Orders() {
         return 'bg-red-100 text-red-700';
       default:
         return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case 'card':
+        return <CreditCard className="h-4 w-4" />;
+      case 'upi':
+        return <Smartphone className="h-4 w-4" />;
+      case 'netbanking':
+        return <Building2 className="h-4 w-4" />;
+      case 'wallet':
+        return <Wallet className="h-4 w-4" />;
+      case 'cod':
+        return <Truck className="h-4 w-4" />;
+      default:
+        return <CreditCard className="h-4 w-4" />;
+    }
+  };
+
+  const getPaymentMethodName = (method: string) => {
+    switch (method) {
+      case 'card':
+        return 'Card';
+      case 'upi':
+        return 'UPI';
+      case 'netbanking':
+        return 'Net Banking';
+      case 'wallet':
+        return 'Wallet';
+      case 'cod':
+        return 'Cash on Delivery';
+      default:
+        return 'Card';
     }
   };
 
@@ -92,6 +126,10 @@ export default function Orders() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
+                      {getPaymentMethodIcon(order.paymentMethod || 'card')}
+                      <span className="text-sm">{getPaymentMethodName(order.paymentMethod || 'card')}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <CreditCard className="h-4 w-4" />
                       <span className="text-sm font-mono">{order.paymentId || 'N/A'}</span>
                     </div>
@@ -132,6 +170,32 @@ export default function Orders() {
                   </div>
 
                   <hr className="my-4 border-border" />
+
+                  {/* Delivery Address */}
+                  {order.deliveryAddress && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Delivery Address
+                      </h4>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="font-medium">{order.deliveryAddress.name}</p>
+                        <p className="text-sm text-muted-foreground">{order.deliveryAddress.street}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.deliveryAddress.city}, {order.deliveryAddress.state} - {order.deliveryAddress.pincode}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{order.deliveryAddress.phone}</p>
+                        {order.deliveryAddress.landmark && (
+                          <p className="text-sm text-muted-foreground">Landmark: {order.deliveryAddress.landmark}</p>
+                        )}
+                        {order.deliveryAddress.locationDetails && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            📍 {order.deliveryAddress.locationDetails}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Total Amount</span>

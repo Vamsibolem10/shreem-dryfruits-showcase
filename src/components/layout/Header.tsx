@@ -29,15 +29,17 @@ export default function Header() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-full bg-gradient-gold flex items-center justify-center shadow-gold group-hover:scale-110 transition-transform duration-300">
-              <span className="text-walnut-dark font-serif font-bold text-xl">S</span>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Shreem Nuts N Fruits" 
+              className="w-12 h-12 rounded-full object-cover shadow-gold group-hover:scale-110 transition-transform duration-300"
+            />
             <div className="hidden sm:block">
               <h1 className="font-serif text-2xl font-bold text-foreground">
-                Shreem
+                Shreem Nuts N Fruits
               </h1>
               <p className="text-xs text-muted-foreground tracking-widest uppercase">
-                Premium Dryfruits
+                Prosperty in Every Bite
               </p>
             </div>
           </Link>
@@ -92,7 +94,7 @@ export default function Header() {
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-3 py-2">
                     <p className="font-medium">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <p className="text-sm text-muted-foreground">{user.phoneNumber}</p>
                     <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-gold/20 text-gold-dark rounded-full capitalize">
                       {user.role}
                     </span>
@@ -102,7 +104,17 @@ export default function Header() {
                     <Package className="mr-2 h-4 w-4" />
                     My Orders
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="mr-2 h-4 w-4" />
+                    My Profile
+                  </DropdownMenuItem>
                   {isEmployee && (
+                    <DropdownMenuItem onClick={() => navigate('/employee')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Employee Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
                     <DropdownMenuItem onClick={() => navigate('/admin')}>
                       <Settings className="mr-2 h-4 w-4" />
                       Admin Panel

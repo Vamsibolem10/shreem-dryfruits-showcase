@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import { useShop } from '@/context/ShopContext';
 import CouponInput from '@/components/promo/CouponInput';
 import { toast } from 'sonner';
-
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
+import { Order, Address } from '@/types';
 
 export default function Cart() {
   const { items, removeFromCart, updateQuantity, total, clearCart, addOrder } = useCart();
   const { user } = useAuth();
+  const { shopConfig } = useShop();
   const navigate = useNavigate();
   
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState<Address | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const paymentMethod = 'cod' as const;
 
   const subtotal = total;
   const discount = appliedCoupon?.discount || 0;
@@ -34,6 +34,28 @@ export default function Cart() {
     setAppliedCoupon(null);
   };
 
+  const sendOrderNotification = (order: Order) => {
+    // In a real application, this would send an email/SMS to admin
+    // For now, we'll store notifications in localStorage for admin to see
+    const notifications = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
+    const notification = {
+      id: `NOTIF-${Date.now()}`,
+      type: 'new_order',
+      title: 'New Order Received',
+      message: `Order ${order.id} placed by ${user?.name || 'Customer'} for ₹${order.total}`,
+      orderId: order.id,
+      customerName: user?.name || 'Unknown',
+      customerPhone: deliveryAddress?.phone || 'N/A',
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      items: order.items.length,
+      date: new Date().toISOString(),
+      read: false,
+    };
+    notifications.unshift(notification);
+    localStorage.setItem('adminNotifications', JSON.stringify(notifications));
+  };
+
   const handleCheckout = () => {
     if (!user) {
       toast.error('Please login to checkout');
@@ -46,53 +68,37 @@ export default function Cart() {
       return;
     }
 
-    // Load Razorpay script dynamically
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => {
-      const options = {
-        key: 'rzp_test_demo', // Demo key - replace with actual key
-        amount: finalTotal * 100, // Amount in paise
-        currency: 'INR',
-        name: 'Shreem Dryfruits',
-        description: 'Premium Dry Fruits Order',
-        image: '/favicon.ico',
-        handler: function (response: { razorpay_payment_id: string }) {
-          // Create order
-          const order = {
-            id: `ORD-${Date.now()}`,
-            userId: user.id,
-            items: [...items],
-            total: subtotal,
-            status: 'completed' as const,
-            date: new Date().toISOString(),
-            paymentId: response.razorpay_payment_id,
-            couponCode: appliedCoupon?.code,
-            discount: appliedCoupon?.discount,
-          };
-          addOrder(order);
-          toast.success('Payment successful! Order placed.');
-          navigate('/orders');
-        },
-        prefill: {
-          name: user.name,
-          email: user.email,
-        },
-        theme: {
-          color: '#5B4636',
-        },
-        modal: {
-          ondismiss: function () {
-            toast.info('Payment cancelled');
-          },
-        },
-      };
+    // For COD, we need delivery address
+    if (!deliveryAddress) {
+      toast.error('Please add a delivery address for COD orders');
+      setShowAddressForm(true);
+      return;
+    }
 
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+    // COD order - no payment required
+    const order = {
+      id: `ORD-${Date.now()}`,
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      items: [...items],
+      total: subtotal,
+      status: 'pending' as const,
+      date: new Date().toISOString(),
+      paymentMethod: 'cod',
+      couponCode: appliedCoupon?.code,
+      discount: appliedCoupon?.discount,
+      deliveryAddress: deliveryAddress,
     };
-    document.body.appendChild(script);
+    addOrder(order);
+    sendOrderNotification(order);
+    toast.success('Order placed successfully! Pay on delivery.');
+    navigate('/orders');
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard!');
   };
 
   if (items.length === 0) {
@@ -230,6 +236,57 @@ export default function Cart() {
                   />
                 </div>
 
+                {/* Payment Method - COD Only */}
+                <div className="mb-6">
+                  <h3 className="font-semibold text-foreground mb-3">Payment Method</h3>
+                  <div className="p-4 bg-[hsl(42,75%,55%)]/10 border border-[hsl(42,75%,55%)] rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-[hsl(42,75%,55%)]" />
+                      <span className="font-medium text-foreground">Cash on Delivery</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">Pay when you receive your order</p>
+                  </div>
+                </div>
+
+                {/* Delivery Address */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-foreground">Delivery Address</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddressForm(!showAddressForm)}
+                    >
+                      {deliveryAddress ? 'Change Address' : 'Add Address'}
+                    </Button>
+                  </div>
+
+                  {deliveryAddress ? (
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="font-medium">{deliveryAddress.name}</p>
+                      <p className="text-sm text-muted-foreground">{deliveryAddress.street}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {deliveryAddress.city}, {deliveryAddress.state} - {deliveryAddress.pincode}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{deliveryAddress.phone}</p>
+                      {deliveryAddress.locationDetails && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          📍 {deliveryAddress.locationDetails}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-muted/50 rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">No delivery address added</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Required for {paymentMethod === 'cod' ? 'COD orders' : 'delivery'}
+                      </p>
+                    </div>
+                  )}
+
+                  {showAddressForm && <AddressForm onAddressAdd={setDeliveryAddress} onClose={() => setShowAddressForm(false)} />}
+                </div>
+
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
@@ -260,8 +317,9 @@ export default function Cart() {
                   size="lg"
                   className="w-full mb-4 h-14 text-lg bg-[hsl(42,75%,55%)] text-[hsl(25,30%,15%)] hover:bg-[hsl(42,70%,50%)]"
                   onClick={handleCheckout}
+                  disabled={!deliveryAddress}
                 >
-                  Proceed to Checkout
+                  Place Order - Pay on Delivery ₹{finalTotal}
                 </Button>
 
                 <Link to="/products" className="block text-center">
@@ -283,3 +341,233 @@ export default function Cart() {
     </Layout>
   );
 }
+
+// Address Form Component
+function AddressForm({ onAddressAdd, onClose }: { onAddressAdd: (address: Address) => void; onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    street: '',
+    city: '',
+    state: '',
+    pincode: '',
+    landmark: '',
+  });
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [locationDetails, setLocationDetails] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by this browser');
+      return;
+    }
+
+    setIsLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // Reverse geocoding using a free API (you can replace with Google Maps API)
+          const response = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+          );
+          const data = await response.json();
+          
+          const locationString = `${data.city}, ${data.principalSubdivision}, ${data.countryName}`;
+          setLocationDetails(`📍 ${locationString} (Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)})`);
+          
+          // Auto-fill city and state if available
+          if (data.city && !formData.city) {
+            setFormData(prev => ({ ...prev, city: data.city }));
+          }
+          if (data.principalSubdivision && !formData.state) {
+            setFormData(prev => ({ ...prev, state: data.principalSubdivision }));
+          }
+          
+          toast.success('Location detected successfully!');
+        } catch (error) {
+          setLocationDetails(`📍 Coordinates: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          toast.info('Location coordinates captured, but address details unavailable');
+        }
+        
+        setIsLoadingLocation(false);
+      },
+      (error) => {
+        setIsLoadingLocation(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            toast.error('Location access denied. Please enable location permissions.');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            toast.error('Location information is unavailable.');
+            break;
+          case error.TIMEOUT:
+            toast.error('Location request timed out.');
+            break;
+          default:
+            toast.error('An unknown error occurred.');
+            break;
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      }
+    );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.phone || !formData.street || !formData.city || !formData.state || !formData.pincode) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    const address = {
+      id: `ADDR-${Date.now()}`,
+      userId: 'current-user', // This should come from auth context
+      ...formData,
+      latitude: locationDetails.includes('Lat:') ? parseFloat(locationDetails.split('Lat: ')[1].split(',')[0]) : undefined,
+      longitude: locationDetails.includes('Lng:') ? parseFloat(locationDetails.split('Lng: ')[1].split(')')[0]) : undefined,
+      locationDetails,
+      isDefault: false,
+    };
+
+    onAddressAdd(address);
+    onClose();
+    toast.success('Delivery address added successfully!');
+  };
+
+  return (
+    <div className="mt-4 p-4 border border-border rounded-lg bg-card">
+      <h4 className="font-medium mb-4">Add Delivery Address</h4>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Full Name *</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-border rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Phone Number *</label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-border rounded-md"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Street Address *</label>
+          <input
+            type="text"
+            name="street"
+            value={formData.street}
+            onChange={handleInputChange}
+            className="w-full p-2 border border-border rounded-md"
+            placeholder="House number, street name"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">City *</label>
+            <input
+              type="text"
+              name="city"
+              value={formData.city}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-border rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">State *</label>
+            <input
+              type="text"
+              name="state"
+              value={formData.state}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-border rounded-md"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Pincode *</label>
+            <input
+              type="text"
+              name="pincode"
+              value={formData.pincode}
+              onChange={handleInputChange}
+              className="w-full p-2 border border-border rounded-md"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Landmark (Optional)</label>
+          <input
+            type="text"
+            name="landmark"
+            value={formData.landmark}
+            onChange={handleInputChange}
+            className="w-full p-2 border border-border rounded-md"
+            placeholder="Near landmark"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium">Location</label>
+            <button
+              type="button"
+              onClick={getCurrentLocation}
+              disabled={isLoadingLocation}
+              className="text-sm text-[hsl(42,75%,55%)] hover:text-[hsl(42,70%,50%)] disabled:opacity-50"
+            >
+              {isLoadingLocation ? 'Getting location...' : '📍 Use current location'}
+            </button>
+          </div>
+          {locationDetails && (
+            <div className="p-2 bg-muted rounded text-sm">
+              {locationDetails}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2 pt-4">
+          <Button type="submit" className="flex-1">
+            Save Address
+          </Button>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+

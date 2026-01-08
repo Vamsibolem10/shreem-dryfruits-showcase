@@ -3,8 +3,11 @@ import { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name: string) => Promise<boolean>;
+  login: (phoneNumber: string) => Promise<boolean>; // Phone-only login
+  adminLogin: (email: string, password: string) => Promise<boolean>;
+  employeeLogin: (email: string, password: string) => Promise<boolean>;
+  register: (phoneNumber: string, password: string, name: string) => Promise<boolean>;
+  updateProfile: (name: string, address: string) => Promise<boolean>;
   logout: () => void;
   isAdmin: boolean;
   isEmployee: boolean;
@@ -12,10 +15,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Default admin and employee accounts
+// Default admin and employee accounts (for backward compatibility)
 const defaultUsers: (User & { password: string })[] = [
-  { id: '1', email: 'admin@shreem.com', password: 'admin123', name: 'Admin', role: 'admin' },
-  { id: '2', email: 'employee@shreem.com', password: 'employee123', name: 'Employee', role: 'employee' },
+  { id: '1', phoneNumber: 'admin@shreem.com', password: 'admin123', name: 'Admin', role: 'admin' },
+  { id: '2', phoneNumber: 'employee@shreem.com', password: 'employee123', name: 'Employee', role: 'employee' },
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -28,20 +31,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const getUsers = (): (User & { password: string })[] => {
-    const stored = localStorage.getItem('shreemUsers');
-    if (stored) {
-      return [...defaultUsers, ...JSON.parse(stored)];
+  const login = async (phoneNumber: string): Promise<boolean> => {
+    // Check default users first (for admin/employee accounts)
+    const defaultUser = defaultUsers.find(u => u.phoneNumber === phoneNumber);
+    if (defaultUser) {
+      const { password: _, ...userWithoutPassword } = defaultUser;
+      setUser(userWithoutPassword);
+      localStorage.setItem('shreemUser', JSON.stringify(userWithoutPassword));
+      return true;
     }
-    return defaultUsers;
+
+    try {
+      // Use check-phone endpoint: returns exists=true if already present, exists=false and creates user otherwise
+      const response = await fetch('http://localhost:5002/api/auth/check-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        if (data.exists) {
+          // existing user
+          setUser(data.user);
+          localStorage.setItem('shreemUser', JSON.stringify(data.user));
+          return true;
+        } else {
+          // newly created
+          setUser(data.user);
+          localStorage.setItem('shreemUser', JSON.stringify(data.user));
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const users = getUsers();
-    const foundUser = users.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser;
+  const adminLogin = async (email: string, password: string): Promise<boolean> => {
+    const adminUser = defaultUsers.find(u => u.phoneNumber === email && u.password === password && u.role === 'admin');
+    if (adminUser) {
+      const { password: _, ...userWithoutPassword } = adminUser;
       setUser(userWithoutPassword);
       localStorage.setItem('shreemUser', JSON.stringify(userWithoutPassword));
       return true;
@@ -49,28 +80,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const register = async (email: string, password: string, name: string): Promise<boolean> => {
-    const users = getUsers();
-    if (users.find(u => u.email === email)) {
+  const employeeLogin = async (email: string, password: string): Promise<boolean> => {
+    const employeeUser = defaultUsers.find(u => u.phoneNumber === email && u.password === password && u.role === 'employee');
+    if (employeeUser) {
+      const { password: _, ...userWithoutPassword } = employeeUser;
+      setUser(userWithoutPassword);
+      localStorage.setItem('shreemUser', JSON.stringify(userWithoutPassword));
+      return true;
+    }
+    return false;
+  };
+
+  const register = async (phoneNumber: string, password: string, name: string): Promise<boolean> => {
+    try {
+      const response = await fetch('http://localhost:5002/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber, password, name }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        localStorage.setItem('shreemUser', JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Registration error:', error);
       return false;
     }
-
-    const newUser: User & { password: string } = {
-      id: Date.now().toString(),
-      email,
-      password,
-      name,
-      role: 'customer',
-    };
-
-    const customUsers = JSON.parse(localStorage.getItem('shreemUsers') || '[]');
-    customUsers.push(newUser);
-    localStorage.setItem('shreemUsers', JSON.stringify(customUsers));
-
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('shreemUser', JSON.stringify(userWithoutPassword));
-    return true;
   };
 
   const logout = () => {
@@ -78,15 +120,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('shreemUser');
   };
 
+  const updateProfile = async (name: string, address: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const response = await fetch('http://localhost:5002/api/auth/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: user.phoneNumber, name, address }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUser(data.user);
+        localStorage.setItem('shreemUser', JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      return false;
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    login,
+    adminLogin,
+    employeeLogin,
+    register,
+    updateProfile,
+    logout,
+    isAdmin: user?.role === 'admin',
+    isEmployee: user?.role === 'employee',
+  };
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      register,
-      logout,
-      isAdmin: user?.role === 'admin',
-      isEmployee: user?.role === 'employee' || user?.role === 'admin',
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

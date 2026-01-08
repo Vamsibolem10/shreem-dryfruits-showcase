@@ -39,7 +39,7 @@ export default function About() {
             Our Story
           </p>
           <h1 className="font-serif text-5xl md:text-6xl font-bold text-primary-foreground mb-6">
-            About Shreem Dryfruits
+            About Shreem Nuts N Fruits
           </h1>
           <div className="w-24 h-1 bg-gradient-gold mx-auto rounded-full" />
         </div>
@@ -58,7 +58,7 @@ export default function About() {
               </h2>
               <div className="space-y-4 text-muted-foreground leading-relaxed font-body">
                 <p>
-                  Shreem Dryfruits began with a simple vision: to bring the finest quality 
+                  Shreem Nuts N Fruits began with a simple vision: to bring the finest quality 
                   dry fruits and nuts directly from farms to your table. What started as a 
                   small family business has grown into a trusted name in premium dry fruits.
                 </p>
@@ -69,7 +69,7 @@ export default function About() {
                   meets our exacting standards of quality and freshness.
                 </p>
                 <p>
-                  Today, Shreem Dryfruits serves over 50,000 happy customers, continuing 
+                  Today, Shreem Nuts N Fruits serves over 50,000 happy customers, continuing 
                   the legacy of quality that our family has upheld for generations.
                 </p>
               </div>

@@ -1,31 +1,12 @@
 import React from 'react';
 import { Star, Quote } from 'lucide-react';
-
-const testimonials = [
-  {
-    name: 'Priya Sharma',
-    location: 'Mumbai',
-    rating: 5,
-    text: 'The quality of cashews is exceptional! I\'ve been ordering from Shreem for over 2 years now. Best dry fruits I\'ve ever had.',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-  },
-  {
-    name: 'Rajesh Kumar',
-    location: 'Delhi',
-    rating: 5,
-    text: 'Amazing gift boxes! Perfect for festive occasions. The packaging is premium and the taste is unmatched.',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-  },
-  {
-    name: 'Anita Desai',
-    location: 'Bangalore',
-    rating: 5,
-    text: 'Fast delivery and fresh products every time. The almonds are so crunchy and flavorful. Highly recommend!',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100',
-  },
-];
+import { useContent } from '@/context/ContentContext';
 
 export default function Testimonials() {
+  const { testimonials } = useContent();
+
+  const activeTestimonials = testimonials.filter(t => t.isActive);
+
   return (
     <section className="py-24 bg-primary relative overflow-hidden">
       {/* Decorative Elements */}
@@ -46,7 +27,7 @@ export default function Testimonials() {
 
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
+          {activeTestimonials.map((testimonial, index) => (
             <div
               key={testimonial.name}
               className="bg-primary-foreground/10 backdrop-blur-sm p-8 rounded-2xl border border-primary-foreground/10 hover:border-gold/30 transition-all duration-500 animate-fade-in"

@@ -2,15 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useContent } from '@/context/ContentContext';
 
 export default function Hero() {
+  const { heroContent } = useContent();
+
+  if (!heroContent) return null;
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: 'url(https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=1920)',
+          backgroundImage: `url(${heroContent.backgroundImage})`,
         }}
       >
         <div className="absolute inset-0 bg-gradient-hero" />
@@ -26,19 +31,18 @@ export default function Hero() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-gold/20 backdrop-blur-sm px-4 py-2 rounded-full mb-8 animate-fade-in">
             <Sparkles className="w-4 h-4 text-gold" />
-            <span className="text-gold text-sm font-medium">Premium Quality Since 2010</span>
+            <span className="text-gold text-sm font-medium">{heroContent.badge}</span>
           </div>
 
           {/* Heading */}
           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-bold text-cream leading-tight mb-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-            Nature's Finest
-            <span className="block text-shimmer">Dry Fruits</span>
+            {heroContent.heading}
+            <span className="block text-shimmer">{heroContent.subheading}</span>
           </h1>
 
           {/* Description */}
           <p className="text-cream/80 text-lg md:text-xl max-w-xl mb-10 leading-relaxed animate-fade-in font-body" style={{ animationDelay: '0.2s' }}>
-            Discover the exquisite taste of hand-picked, premium quality dry fruits 
-            sourced from the finest orchards around the world.
+            {heroContent.description}
           </p>
 
           {/* CTA Buttons */}
