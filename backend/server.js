@@ -44,8 +44,8 @@ const upload = multer({
   }
 });
 
-// MongoDB connection (use MONGO_URI from environment when available)
-const mongoUri = process.env.MONGO_URI || 'mongodb+srv://bolemvamsi:Mike%400501@cluster0.9iryn.mongodb.net/shreemDB?retryWrites=true&w=majority';
+// MongoDB connection (use MONGO_URI from environment)
+const mongoUri = process.env.MONGO_URI;
 
 console.log('Attempting to connect to MongoDB Atlas...');
 
