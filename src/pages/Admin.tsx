@@ -333,6 +333,16 @@ export default function Admin() {
     }
   };
 
+  const handleToggleStock = async (id: string, inStock: boolean) => {
+    try {
+      await updateProduct(id, { inStock });
+      toast.success(`Product ${inStock ? 'marked as in stock' : 'marked as out of stock'}!`);
+    } catch (error) {
+      console.error('Failed to update stock status:', error);
+      toast.error('Failed to update stock status');
+    }
+  };
+
   const handleOpenCouponDialog = (coupon?: Coupon) => {
     if (coupon) {
       setEditingCoupon(coupon);
@@ -1177,6 +1187,14 @@ export default function Admin() {
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">
+                          <Button
+                            variant={product.inStock ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleToggleStock(product.id, !product.inStock)}
+                            className={product.inStock ? "bg-green-600 hover:bg-green-700" : ""}
+                          >
+                            {product.inStock ? 'In Stock' : 'Out of Stock'}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"

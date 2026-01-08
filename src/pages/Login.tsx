@@ -191,7 +191,7 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      placeholder="admin@shreem.com"
+                      placeholder="Enter admin email"
                       className="mt-1"
                     />
                   </div>
@@ -235,7 +235,7 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      placeholder="employee@shreem.com"
+                      placeholder="Enter employee email"
                       className="mt-1"
                     />
                   </div>

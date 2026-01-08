@@ -225,6 +225,7 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   category: { type: String },
   photoPath: { type: String }, // path to photo on filesystem
+  inStock: { type: Boolean, default: true }, // stock status
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -1031,27 +1032,21 @@ app.post('/api/products/upload-photo', upload.single('photo'), async (req, res) 
 });
 
 // Upload testimonial avatar
-app.post('/api/testimonials/upload-avatar', multer({ dest: 'temp/' }).single('avatar'), async (req, res) => {
+app.post('/api/testimonials/upload-avatar', upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No avatar uploaded' });
     }
 
-    // Ensure temp directory exists
-    const tempDir = path.join(__dirname, 'temp');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    // Create testimonial_avatars directory if it doesn't exist
+    // Move file from product_photos to testimonial_avatars directory
+    const sourcePath = path.join(__dirname, 'product_photos', req.file.filename);
     const avatarDir = path.join(__dirname, 'testimonial_avatars');
     if (!fs.existsSync(avatarDir)) {
       fs.mkdirSync(avatarDir, { recursive: true });
     }
 
-    // Move file to testimonial_avatars directory
     const avatarPath = path.join(avatarDir, req.file.filename);
-    fs.renameSync(req.file.path, avatarPath);
+    fs.renameSync(sourcePath, avatarPath);
 
     const publicPath = `/testimonial_avatars/${req.file.filename}`;
 
@@ -1085,7 +1080,28 @@ app.get('/api/products', async (req, res) => {
       return res.json({ success: true, products: [], fallback: true });
     }
     const products = await Product.find().sort({ createdAt: -1 });
-    res.json({ success: true, products });
+    
+    // Get base URL for images (in production, this should be the same domain)
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `${req.protocol}://${req.get('host')}`
+      : 'http://localhost:5002';
+    
+    // Transform products to match frontend interface (photoPath -> image)
+    const transformedProducts = products.map(product => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      category: product.category,
+      image: product.photoPath ? `${baseUrl}${product.photoPath}` : 'https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=500',
+      weight: '500g', // Default weight since not stored in DB
+      inStock: product.inStock !== undefined ? product.inStock : true, // Use stored value or default to true
+      featured: false, // Default featured since not stored in DB
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt
+    }));
+    
+    res.json({ success: true, products: transformedProducts });
   } catch (error) {
     console.error('Products retrieval error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -1104,6 +1120,134 @@ app.get('/api/products/:productId', async (req, res) => {
     res.json({ success: true, product, stock });
   } catch (error) {
     console.error('Product retrieval error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Create new product
+app.post('/api/products', async (req, res) => {
+  try {
+    const productData = req.body;
+
+    if (!productData.name || !productData.price) {
+      return res.status(400).json({ success: false, message: 'Product name and price are required' });
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ success: false, message: 'Database not connected' });
+    }
+
+    const newProduct = new Product({
+      id: Date.now().toString(),
+      name: productData.name,
+      description: productData.description,
+      price: productData.price,
+      photoPath: productData.image, // Store the uploaded photo path
+      category: productData.category,
+      inStock: productData.inStock !== undefined ? productData.inStock : true, // Default to true
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await newProduct.save();
+
+    // Get base URL for images
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `${req.protocol}://${req.get('host')}`
+      : 'http://localhost:5002';
+
+    // Transform the product to match frontend interface
+    const transformedProduct = {
+      id: newProduct.id,
+      name: newProduct.name,
+      description: newProduct.description,
+      price: newProduct.price,
+      category: newProduct.category,
+      image: newProduct.photoPath ? `${baseUrl}${newProduct.photoPath}` : 'https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=500',
+      weight: '500g', // Default weight
+      inStock: newProduct.inStock,
+      featured: false, // Default featured
+      createdAt: newProduct.createdAt,
+      updatedAt: newProduct.updatedAt
+    };
+
+    res.json({ success: true, product: transformedProduct });
+  } catch (error) {
+    console.error('Product creation error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Update product
+app.put('/api/products/:productId', async (req, res) => {
+  try {
+    const productData = req.body;
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ success: false, message: 'Database not connected' });
+    }
+
+    const product = await Product.findOne({ id: req.params.productId });
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    // Update fields
+    if (productData.name !== undefined) product.name = productData.name;
+    if (productData.description !== undefined) product.description = productData.description;
+    if (productData.price !== undefined) product.price = productData.price;
+    if (productData.image !== undefined) product.photoPath = productData.image;
+    if (productData.category !== undefined) product.category = productData.category;
+    if (productData.inStock !== undefined) product.inStock = productData.inStock;
+    product.updatedAt = new Date();
+
+    await product.save();
+
+    // Get base URL for images
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `${req.protocol}://${req.get('host')}`
+      : 'http://localhost:5002';
+
+    // Transform the product to match frontend interface
+    const transformedProduct = {
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      category: product.category,
+      image: product.photoPath ? `${baseUrl}${product.photoPath}` : 'https://images.unsplash.com/photo-1571939228382-b2f2b585ce15?w=500',
+      weight: '500g', // Default weight
+      inStock: product.inStock,
+      featured: false, // Default featured
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt
+    };
+
+    res.json({ success: true, product: transformedProduct });
+  } catch (error) {
+    console.error('Product update error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Delete product
+app.delete('/api/products/:productId', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(500).json({ success: false, message: 'Database not connected' });
+    }
+
+    const product = await Product.findOneAndDelete({ id: req.params.productId });
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    // Also delete associated stock if exists
+    await Stock.findOneAndDelete({ productId: req.params.productId });
+
+    res.json({ success: true, message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Product deletion error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

@@ -137,16 +137,75 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('shreemProducts', JSON.stringify(newProducts));
   };
 
-  const addProduct = (product: Omit<Product, 'id'>) => {
+  const addProduct = async (product: Omit<Product, 'id'>) => {
+    try {
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(product),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setProducts(prev => [...prev, data.product]);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add product to API:', error);
+    }
+
+    // Fallback to localStorage
     const newProduct = { ...product, id: Date.now().toString() };
     saveProducts([...products, newProduct]);
   };
 
-  const updateProduct = (id: string, updates: Partial<Product>) => {
+  const updateProduct = async (id: string, updates: Partial<Product>) => {
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setProducts(prev => prev.map(p => p.id === id ? data.product : p));
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to update product in API:', error);
+    }
+
+    // Fallback to localStorage
     saveProducts(products.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
-  const deleteProduct = (id: string) => {
+  const deleteProduct = async (id: string) => {
+    try {
+      const response = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setProducts(prev => prev.filter(p => p.id !== id));
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete product from API:', error);
+    }
+
+    // Fallback to localStorage
     saveProducts(products.filter(p => p.id !== id));
   };
 
